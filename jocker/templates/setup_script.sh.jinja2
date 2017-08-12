@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# BEFORE: DAEMON
+# PROVIDE: {{ flavour.filename }}
+#
+# ezjail flavour {{ flavour.name }} setup
+
+. /etc/rc.subr
+
+{% include "load_env.sh.jinja2" %}
+
+name={{ flavour.name }}
+start_cmd={{ flavour.name }}_setup
+
+{{ flavour.name }}_setup() {
+  # Remove traces of ourself
+  rm -f "/etc/rc.d/{{ flavour.filename }}"
+
+  {{ flavour.command }}
+}
+
+run_rc_command "$1"

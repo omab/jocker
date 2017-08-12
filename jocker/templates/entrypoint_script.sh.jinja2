@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# ezjail flavour {{ flavour.name }} entrypoint script
+
+{% include "load_env.sh.jinja2" %}
+
+{{ flavour.command }}
