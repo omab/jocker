@@ -3,11 +3,17 @@ import sys
 import argparse
 
 from .build import build
+from .create import create
 
 
 def do_build(args):
     """Run build"""
     build(args.jailfile, build=args.build, install=args.install)
+
+
+def do_create(args):
+    """Run create"""
+    create(args.jailfile, name=args.name, network=args.net)
 
 
 def do_import(args):
@@ -28,12 +34,20 @@ subparsers = parser.add_subparsers()
 
 build_parser = subparsers.add_parser(
     'build',
-    description='Build jail into flavour'
+    description='Build a jail flavour'
 )
 build_parser.add_argument('--build', help='build directory')
 build_parser.add_argument('--install', action='store_true',
                           help='install the built jail flavour')
 build_parser.set_defaults(func=do_build)
+
+create_parser = subparsers.add_parser(
+    'create',
+    description='Create a jail from the created flavour'
+)
+create_parser.add_argument('--name', help='jail name')
+create_parser.add_argument('--net', help='jail network')
+create_parser.set_defaults(func=do_create)
 
 import_parser = subparsers.add_parser(
     'import',
