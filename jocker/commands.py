@@ -39,6 +39,18 @@ def flavour_name(commands):
     return flavour_commands(commands, CommandName)[0].get_value()
 
 
+def flavour_entrypoint(commands):
+    """Return flavour entrypoint defined by the ENTRYPOINT command"""
+    return flavour_commands(commands, CommandEntrypoint)[0].get_value()
+
+
+def flavour_entrypoint_script_path(commands):
+    """Return the script path for the default entrypoint command"""
+    name = flavour_name(commands)
+    return os.path.join('usr', 'local', 'bin',
+                        'flavour_{name}'.format(name=name))
+
+
 class CommandBase(object):
     """
     Base class for commands that can be ran from a Jailfile.
@@ -241,8 +253,7 @@ class CommandEntrypoint(CommandRun):
     def build(self, destdir, commands):
         """Save entrypoint into a script at /usr/local/bin"""
         name = flavour_name(commands)
-        destpath = os.path.join('usr', 'local', 'bin',
-                                'flavour_{name}'.format(name=name))
+        destpath = flavour_entrypoint_script_path(commands)
         self.render_script(destdir, destpath, 'entrypoint_script.sh.jinja2', {
             'flavour': {
                 'name': name,

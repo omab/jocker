@@ -4,6 +4,7 @@ import argparse
 
 from .build import build
 from .create import create
+from .runner import run
 
 
 def do_build(args):
@@ -21,10 +22,12 @@ def do_import(args):
 
 
 def do_run(args):
-    print('RUN:', args)
+    run(args.jailfile, name=args.name, command=args.command, args=args.args)
 
 
-parser = argparse.ArgumentParser(description='Jocker - jail definition and management tool')
+parser = argparse.ArgumentParser(
+    description='Jocker - jail definition and management tool'
+)
 parser.add_argument(
     '--jailfile',
     default='Jailfile',
@@ -61,7 +64,7 @@ run_parser = subparsers.add_parser(
     description='Run a command in the given jail'
 )
 run_parser.add_argument('name', help='jail to run the command on')
-run_parser.add_argument('command', nargs='+', help='command to run')
+run_parser.add_argument('command', nargs='?', help='command to run')
 run_parser.add_argument('args', nargs=argparse.REMAINDER,
                         help='command arguments to run')
 run_parser.set_defaults(func=do_run)

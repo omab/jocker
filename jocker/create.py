@@ -1,13 +1,9 @@
 """
 Create a jail from the flavour
 """
-
-import os
-import uuid
-import subprocess
-
 from .parser import parse
 from .commands import flavour_name
+from .ezjail import create as ezjail_create
 
 
 def create(jailfile='Jailfile', name=None, network=None):
@@ -16,10 +12,4 @@ def create(jailfile='Jailfile', name=None, network=None):
     """
     commands = parse(jailfile)
     flavour = flavour_name(commands)
-    name = name or '{flavour}_{id}'.format(flavour=flavour, id=uuid.uuid4())
-    network = network or 'lo1|127.1.1.5'
-    subprocess.run('ezjail-admin create -f {flavour} {name} \'{network}\''.format(
-        flavour=flavour,
-        name=name,
-        network=network
-    ), shell=True)
+    return ezjail_create(flavour, name, network)
