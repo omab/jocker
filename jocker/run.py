@@ -3,18 +3,25 @@ import sys
 import argparse
 
 from .build import build
-from .create import create
+from .create import create_from_jockerfile, create_from_base
 from .runner import run
 
 
 def do_build(args):
     """Run build"""
-    build(args.jailfile, build=args.build, install=args.install)
+    build(args.jockerfile, build=args.build, install=args.install)
 
 
 def do_create(args):
     """Run create"""
-    create(args.jailfile, name=args.name, network=args.net)
+    if args.base:
+        create_from_base(args.jockerfile,
+                         name=args.name,
+                         network=args.net)
+    else:
+        create_from_jockerfile(args.jockerfile,
+                               name=args.name,
+                               network=args.net)
 
 
 def do_import(args):
@@ -22,41 +29,42 @@ def do_import(args):
 
 
 def do_run(args):
-    run(args.jailfile, name=args.name, command=args.command, args=args.args)
+    run(args.jockerfile, name=args.name, command=args.command, args=args.args)
 
 
 parser = argparse.ArgumentParser(
     description='Jocker - jail definition and management tool'
 )
 parser.add_argument(
-    '--jailfile',
-    default='Jailfile',
-    help='specify the Jailfile (default Jailfile)'
+    '--jockerfile',
+    default='Jockerfile',
+    help='specify the Jockerfile (default ./Jockerfile)'
 )
 subparsers = parser.add_subparsers()
 
 build_parser = subparsers.add_parser(
     'build',
-    description='Build a jail flavour'
+    description='Build a jail base'
 )
 build_parser.add_argument('--build', help='build directory')
 build_parser.add_argument('--install', action='store_true',
-                          help='install the built jail flavour')
+                          help='install the built jail base')
 build_parser.set_defaults(func=do_build)
 
 create_parser = subparsers.add_parser(
     'create',
-    description='Create a jail from the created flavour'
+    description='Create a jail from the created base'
 )
+create_parser.add_argument('--base', help='base jail')
 create_parser.add_argument('--name', help='jail name')
 create_parser.add_argument('--net', help='jail network')
 create_parser.set_defaults(func=do_create)
 
 import_parser = subparsers.add_parser(
     'import',
-    description='Import the named jail flavour'
+    description='Import the named jail base'
 )
-import_parser.add_argument('names', nargs='*', help='jail flavours to import')
+import_parser.add_argument('names', nargs='*', help='jail bases to import')
 import_parser.set_defaults(func=do_import)
 
 run_parser = subparsers.add_parser(

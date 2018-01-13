@@ -1,29 +1,36 @@
 """
-Build the given jail flavour
+Build the given Jail base
 """
 import os
 import tempfile
 import shutil
 
-from .parser import parse
+from .parser import parse, build_command
 from .archive import compress, copy_tree
-from .commands import FLAVOURS_DIR, flavour_name
+from .commands import base_name
+from .backends.utils import get_backend
 
 
-def build(jailfile='Jailfile', build=None, install=False):
+def build(jockerfile='Jockerfile', build=None, install=False):
     """
-    Build the flavour from the given Jailfile.
+    Build the base from the given Jockerfile.
     """
-    commands = parse(jailfile)
+    jail_backend = get_backend()
+
+    commands = [
+        # ensure the Jockerfile is copied into the new jail
+        build_command('ADD {path} /etc/'.format(path=jockerfile))
+    ] + parse(jockerfile)
+
     with tempfile.TemporaryDirectory() as tmp:
         for command in commands:
-            command.build(tmp, commands)
+            command.build(jail_backend, tmp, commands)
         if build:
-            destpath = os.path.join(build, flavour_name(commands))
+            destpath = os.path.join(build, base_name(commands))
             copy_tree(tmp, destpath)
             os.chmod(destpath, 0o755)
         if install:
-            destpath = os.path.join(FLAVOURS_DIR, flavour_name(commands))
+            destpath = os.path.join(jail_backend.BASE_DIR, base_name(commands))
             copy_tree(tmp, destpath)
             os.chmod(destpath, 0o755)
         return compress(tmp)

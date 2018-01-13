@@ -8,5 +8,6 @@ RUN pkg update && \
     pkg install nginx
 ADD ./examples/resolv.conf /etc/
 ADD . /code
+VOLUME . /code
 ENTRYPOINT ls / && \
            tail -f /var/log/messages
