@@ -163,7 +163,10 @@ class CommandEnv(CommandBase):
         """
         Split entry in key, value pair.
         """
-        return super(CommandEnv, self).get_value().split(' ', 1)
+        name, value = super(CommandEnv, self).get_value().split(' ', 1)
+        if name in os.environ:
+            value = os.environ[name]
+        return name, value
 
     def run(self, backend, destdir, commands):
         """
