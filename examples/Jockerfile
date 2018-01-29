@@ -4,8 +4,9 @@ VERSION 1.0
 FROM example:latest
 ENV ASSUME_ALWAYS_YES yes
 ENV FOO bar
-RUN pkg update && \
-    pkg install nginx
+RUN env
+RUN pkg update
+RUN pkg install nginx
 ADD ./examples/resolv.conf /etc/
 ADD . /code
 VOLUME . /code

@@ -9,6 +9,7 @@ from .commands import COMMANDS, CommandEnv, CommandName, CommandEntrypoint
 # Join lines split by \
 LINE_SPLITS = re.compile(r'\\\n')
 
+
 def clean_lines(content):
     """
     Take a Jockerfile content and clean each lines.
@@ -43,24 +44,36 @@ def parse(path='Jockerfile'):
 
 class Jockerfile(object):
     def __init__(self, jockerfile='Jockerfile'):
-        """Init parsed Jockerfile"""
+        """
+        Init parsed Jockerfile
+        """
         self.commands = parse(jockerfile)
 
     def name(self):
-        """Return base name defined by the NAME command"""
+        """
+        Return base name defined by the NAME command
+        """
         return self.filter_commands(CommandName)[0].get_value()
 
     def entrypoint(self):
-        """Return base entrypoint defined by the ENTRYPOINT command"""
+        """
+        Return base entrypoint defined by the ENTRYPOINT command
+        """
         return self.filter_commands(CommandEntrypoint)[0].get_value()
+
+    def index_of(self, command):
+        """
+        Return index of command in the commands list
+        """
+        return self.commands.index(command)
 
     def env(self, index=-1):
         """
         Return base env values defined by the ENV command that are
         before the given index
         """
-        return [command.get_value()
-                for command in self.filter_commands(CommandEnv, index)]
+        return dict([command.get_value()
+                     for command in self.filter_commands(CommandEnv, index)])
 
     def filter_commands(self, command_type, index=-1):
         """Return commands of the given type and max index"""

@@ -21,3 +21,6 @@ def create_from_jockerfile(jockerfile, name=None, network=None):
     jockerfile = Jockerfile(jockerfile)
     jail_backend = get_backend(jailname=name)
     jail_backend.create(jockerfile.name(), network)
+    with jail_backend.runner() as runner:
+        for command in jockerfile.commands:
+            command.create(jail_backend, jockerfile)

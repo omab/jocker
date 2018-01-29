@@ -15,7 +15,7 @@ def do_build(args):
 def do_create(args):
     """Run create"""
     if args.base:
-        create_from_base(args.jockerfile,
+        create_from_base(args.base,
                          name=args.name,
                          network=args.net)
     else:

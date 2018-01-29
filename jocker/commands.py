@@ -51,6 +51,12 @@ class CommandBase(object):
         """
         pass
 
+    def create(self, backend, commands):
+        """
+        Create this command into the jail currently running.
+        """
+        pass
+
     def command_name(self):
         """
         Command name, this is derived from the class name, override if needed.
@@ -64,12 +70,6 @@ class CommandBase(object):
         dest = os.path.join(destdir, path)
         os.makedirs(dest, exist_ok=True)
         return dest
-
-    def write_to_jocker(self, destdir, content):
-        """Write content to etc/jocker file"""
-        dest = self.ensure_dir(destdir, 'etc')
-        with open(os.path.join(dest, 'jocker'), 'w') as file:
-            file.write(content)
 
     def render_script(self, destdir, destpath, template_name, context=None):
         """
@@ -94,40 +94,18 @@ class CommandBase(object):
                                           value=self.get_value())
 
 
-class CommandAuthor(CommandBase):
+class CommandNop(CommandBase):
     """
-    AUTHOR command class.
+    NOP (no operation) command.
     """
-    def build(self, backend, destdir, commands):
-        """Write AUTHOR details into etc/jocker file"""
-        self.write_to_jocker(
-            destdir,
-            'AUTHOR {value}'.format(value=self.get_value())
-        )
+    pass
 
 
-class CommandName(CommandBase):
+class CommandName(CommandNop):
     """
     NAME command class.
     """
-    def build(self, backend, destdir, commands):
-        """Write NAME details into etc/jocker file"""
-        self.write_to_jocker(
-            destdir,
-            'NAME {value}'.format(value=self.get_value())
-        )
-
-
-class CommandVersion(CommandBase):
-    """
-    VERSION command class.
-    """
-    def build(self, backend, destdir, commands):
-        """Write VERSION details into etc/jocker file"""
-        self.write_to_jocker(
-            destdir,
-            'VERSION {value}'.format(value=self.get_value())
-        )
+    pass
 
 
 class CommandFrom(CommandBase):
@@ -163,43 +141,45 @@ class CommandEnv(CommandBase):
         """
         Split entry in key, value pair.
         """
-        name, value = super(CommandEnv, self).get_value().split(' ', 1)
-        if name in os.environ:
-            value = os.environ[name]
-        return name, value
+        return super(CommandEnv, self).get_value().split(' ', 1)
 
     def run(self, backend, destdir, commands):
         """
         Run Env command
         """
-        name, value = self.get_value()
-        os.environ[name] = value
+        self.load_value()
 
     def build(self, backend, destdir, commands):
         """
         Build Env command
         """
+        self.load_value()
+
+    def create(self, backend, commands):
+        """
+        Create Env command
+        """
+        self.load_value()
+
+    def load_value(self):
+        """
+        Load value and set it in the environment, don't write if key
+        already there.
+        """
         name, value = self.get_value()
-        os.environ[name] = value
+        if name not in os.environ:
+            os.environ[name] = value
 
 
 class CommandRun(CommandBase):
     """
     RUN command class.
     """
-    def build(self, backend, destdir, commands, template_name='setup_script.sh.jinja2'):
-        name = base_name(commands)
-        index = commands.index(self)
-        filename = '{index:02d}_jail.base.{name}'.format(index=index,
-                                                           name=name)
-        destpath = os.path.join('etc', 'rc.d', filename)
-        self.render_script(destdir, destpath, template_name, {
-            'base': {
-                'filename': filename,
-                'name': name,
-                'command': self.get_value()
-            }
-        })
+    def create(self, backend, commands):
+        """
+        Run the command in the jail being created
+        """
+        backend.exec(self.get_value(), **commands.env(commands.index_of(self)))
 
 
 class CommandAdd(CommandBase):
@@ -213,7 +193,9 @@ class CommandAdd(CommandBase):
         return super(CommandAdd, self).get_value().split(' ', 2)
 
     def build(self, backend, destdir, commands):
-        """Copy the content from value into dest inside the jail"""
+        """
+        Copy the content from value into dest inside the jail
+        """
         orig, dest = self.get_value()
         dest = self.ensure_dir(destdir, dest)
         orig = os.path.abspath(orig)
@@ -240,6 +222,12 @@ class CommandVolume(CommandBase):
         """
         return super(CommandVolume, self).get_value().split(' ', 2)
 
+    def create(self, backend, commands):
+        """
+        Define nullfs mount
+        """
+        pass
+
     def build(self, backend, destdir, commands):
         """Save volume definition"""
         # mount_nullfs  with nullfs, how is it setup?
@@ -251,9 +239,9 @@ class CommandVolume(CommandBase):
 
 
 COMMANDS = {
-    'author': CommandAuthor,
+    'author': CommandNop,
     'name': CommandName,
-    'version': CommandVersion,
+    'version': CommandNop,
     'from': CommandFrom,
     'env': CommandEnv,
     'run': CommandRun,

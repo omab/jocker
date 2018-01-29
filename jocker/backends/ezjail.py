@@ -2,6 +2,7 @@
 ezjail wrapper
 """
 import os
+from io import StringIO
 from subprocess import Popen, PIPE, STDOUT
 
 from .base import Backend
@@ -30,21 +31,27 @@ class EZJailBackend(Backend):
         """Stop jail"""
         return self.ezjail('stop', self.jailname)
 
-    def exec(self, command, env=None):
+    def exec(self, command, **kwargs):
         """Exec the given command in the jail"""
         return self.ezjail('console',
                            '-e \'{command}\''.format(command=command),
-                           self.jailname)
+                           self.jailname, **kwargs)
 
-    def ezjail(self, command, env=None, *args):
+    def ezjail(self, command, *args, **kwargs):
         """
         Run ezjail-admin command with args
         """
         cmd = 'ezjail-admin {command} {args}'.format(command=command,
                                                      args=' '.join(args))
 
+        env = os.environ.copy()
+        env.update(kwargs)
+
         try:
-            with Popen(cmd, shell=True, stdout=PIPE, stderr=STDOUT) as proc:
-                self.logger.info(proc.stdout.read())
+            with Popen(cmd, shell=True, stdout=PIPE, stderr=STDOUT,
+                       env=env) as proc:
+                stdout, _ = proc.communicate()
+                for line in StringIO(stdout.decode()).readlines():
+                    self.logger.info(' ' + line.strip())
         except KeyboardInterrupt:  # Ctrl + c
             pass
