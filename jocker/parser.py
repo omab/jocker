@@ -3,7 +3,7 @@ Jockerfile file format parser
 """
 import re
 
-from .commands import COMMANDS, CommandEnv, CommandName, CommandEntrypoint
+from .commands import COMMANDS, CommandEnv, CommandName, CommandJExec
 
 
 # Join lines split by \
@@ -47,6 +47,7 @@ class Jockerfile(object):
         """
         Init parsed Jockerfile
         """
+        self.path = jockerfile
         self.commands = parse(jockerfile)
 
     def name(self):
@@ -55,19 +56,22 @@ class Jockerfile(object):
         """
         return self.filter_commands(CommandName)[0].get_value()
 
-    def entrypoint(self):
+    def jexec(self):
         """
-        Return base entrypoint defined by the ENTRYPOINT command
+        Return base runtime commands defined by the JEXEC command
         """
-        return self.filter_commands(CommandEntrypoint)[0].get_value()
+        return self.filter_commands(CommandJExec)
 
     def index_of(self, command):
         """
         Return index of command in the commands list
         """
-        return self.commands.index(command)
+        try:
+            return self.commands.index(command)
+        except ValueError:
+            return None
 
-    def env(self, index=-1):
+    def env(self, index=None):
         """
         Return base env values defined by the ENV command that are
         before the given index
@@ -75,7 +79,12 @@ class Jockerfile(object):
         return dict([command.get_value()
                      for command in self.filter_commands(CommandEnv, index)])
 
-    def filter_commands(self, command_type, index=-1):
+    def filter_commands(self, command_type, index=None):
         """Return commands of the given type and max index"""
         return [command for command in self.commands[:index]
                 if isinstance(command, command_type)]
+
+    def __iter__(self):
+        """Iterate over commands"""
+        for item in self.commands:
+            yield item

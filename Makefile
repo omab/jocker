@@ -1,9 +1,15 @@
-test-build:
+test-build-flavour:
 	@ sudo python -m jocker.run --jockerfile examples/Jockerfile build --install
 
-test-create:
-	@ sudo python -m jocker.run create --base web --name website
+test-create-jail:
+	@ sudo python -m jocker.run create --base web --name website --net 're0|192.168.1.52'
 
-test: test-build test-create
+test-run-jail:
+	@ sudo python -m jocker.run run --name website
 
-.PHONY: test test-create test-build
+test-run-shell:
+	@ sudo python -m jocker.run run --name website --command /bin/sh
+
+test: test-build-flavour test-create-jail
+
+.PHONY: test test-create-jail test-build-flavour

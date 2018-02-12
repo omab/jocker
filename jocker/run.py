@@ -29,7 +29,7 @@ def do_import(args):
 
 
 def do_run(args):
-    run(args.jockerfile, name=args.name, command=args.command, args=args.args)
+    run(args.name, command=args.command, args=args.args)
 
 
 parser = argparse.ArgumentParser(
@@ -71,8 +71,8 @@ run_parser = subparsers.add_parser(
     'run',
     description='Run a command in the given jail'
 )
-run_parser.add_argument('name', help='jail to run the command on')
-run_parser.add_argument('command', nargs='?', help='command to run')
+run_parser.add_argument('--name', help='jail to run the command on')
+run_parser.add_argument('--command', nargs='?', help='command to run')
 run_parser.add_argument('args', nargs=argparse.REMAINDER,
                         help='command arguments to run')
 run_parser.set_defaults(func=do_run)

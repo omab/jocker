@@ -2,56 +2,44 @@
 ezjail wrapper
 """
 import os
-from io import StringIO
-from subprocess import Popen, PIPE, STDOUT
 
-from .base import Backend
+from ..utils import run_command
+from .jail import JailBackend
 
 
-class EZJailBackend(Backend):
+class EZJailBackend(JailBackend):
     """EZJail backend"""
+    JAILS_DIR = os.environ.get('JOCKER_JAILS_BASE_DIR', '/usr/jails/')
     BASE_DIR = os.environ.get('JOCKER_BASE_DIR', '/usr/jails/flavours/')
+    DEFAULT_NETWORK = os.environ.get('JOCKER_DEFAULT_NETWORK', 'lo1|127.1.1.5')
 
-    def create(self, base, network=None):
+    def create_jail(self, jockerfile, base=None, network=None):
         """Run ezjail create"""
-        # TODO: select a correct default
-        network = network or 'lo1|127.1.1.5'
-
-        self.ezjail('create',
-                    '-f {base}'.format(base=base),
-                    self.jailname,
-                    '\'{network}\''.format(network=network))
+        base = base or jockerfile.name()
+        self.ezjail(
+            'create',
+            args='-f {base} {jailname} \'{network}\''.format(
+                base=base,
+                jailname=self.jailname,
+                network=network or self.DEFAULT_NETWORK
+            )
+        )
         self.logger.info('Created jail: {name}'.format(name=self.jailname))
 
     def start(self):
         """Start jail"""
-        return self.ezjail('start', self.jailname)
+        return self.ezjail('start', args=self.jailname)
 
     def stop(self):
         """Stop jail"""
-        return self.ezjail('stop', self.jailname)
+        return self.ezjail('stop', args=self.jailname)
 
-    def exec(self, command, **kwargs):
-        """Exec the given command in the jail"""
-        return self.ezjail('console',
-                           '-e \'{command}\''.format(command=command),
-                           self.jailname, **kwargs)
-
-    def ezjail(self, command, *args, **kwargs):
+    def ezjail(self, command, args=None, env=None):
         """
         Run ezjail-admin command with args
         """
-        cmd = 'ezjail-admin {command} {args}'.format(command=command,
-                                                     args=' '.join(args))
-
-        env = os.environ.copy()
-        env.update(kwargs)
-
-        try:
-            with Popen(cmd, shell=True, stdout=PIPE, stderr=STDOUT,
-                       env=env) as proc:
-                stdout, _ = proc.communicate()
-                for line in StringIO(stdout.decode()).readlines():
-                    self.logger.info(' ' + line.strip())
-        except KeyboardInterrupt:  # Ctrl + c
-            pass
+        return run_command(
+            'ezjail-admin {command}'.format(command=command),
+            args=args,
+            env=env
+        )

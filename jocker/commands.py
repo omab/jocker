@@ -33,29 +33,29 @@ class CommandBase(object):
         """
         self.value = value
 
-    def get_value(self):
-        """
-        Return stored value, override if value needs further processing.
-        """
-        return self.value
-
-    def run(self, backend, destdir, commands):
-        """
-        Run this command into the started jail.
-        """
-        pass
-
-    def build(self, backend, destdir, commands):
+    def build(self, backend, destdir):
         """
         Build this command into the jail base being built at destdir.
         """
         pass
 
-    def create(self, backend, commands):
+    def create(self, runner, jockerfile):
         """
-        Create this command into the jail currently running.
+        Run this command into the jail when creating it.
         """
         pass
+
+    def run(self, runner, jockerfile):
+        """
+        Run this command into the started jail.
+        """
+        pass
+
+    def get_value(self):
+        """
+        Return stored value, override if value needs further processing.
+        """
+        return self.value
 
     def command_name(self):
         """
@@ -70,21 +70,6 @@ class CommandBase(object):
         dest = os.path.join(destdir, path)
         os.makedirs(dest, exist_ok=True)
         return dest
-
-    def render_script(self, destdir, destpath, template_name, context=None):
-        """
-        Render script from templates dir into the destination path
-        inside the jail base.
-        """
-        self.ensure_dir(destdir, os.path.dirname(destpath))
-        absolute_destpath = os.path.join(destdir, destpath)
-        with open(absolute_destpath, 'w') as file:
-            context = context or {}
-            template = JINJA_ENV.get_template(template_name)
-            script = template.render(**context)
-            file.write(script)
-        os.chmod(absolute_destpath, 0o755)
-        return absolute_destpath
 
     def __str__(self):
         """
@@ -122,7 +107,7 @@ class CommandFrom(CommandBase):
         """Return an absolute path to an installed base"""
         return os.path.join(backend.BASE_DIR, name)
 
-    def build(self, backend, destdir, commands):
+    def build(self, backend, destdir):
         """
         Copy the content of the different bases into destdir
         """
@@ -143,22 +128,25 @@ class CommandEnv(CommandBase):
         """
         return super(CommandEnv, self).get_value().split(' ', 1)
 
-    def run(self, backend, destdir, commands):
+    def run(self, runner, jockerfile):
         """
         Run Env command
         """
+        # TODO: return values instead of loading them in the os.environ
         self.load_value()
 
-    def build(self, backend, destdir, commands):
+    def build(self, backend, destdir):
         """
         Build Env command
         """
+        # TODO: return values instead of loading them in the os.environ
         self.load_value()
 
-    def create(self, backend, commands):
+    def create(self, runner, jockerfile):
         """
         Create Env command
         """
+        # TODO: return values instead of loading them in the os.environ
         self.load_value()
 
     def load_value(self):
@@ -175,11 +163,12 @@ class CommandRun(CommandBase):
     """
     RUN command class.
     """
-    def create(self, backend, commands):
+    def create(self, runner, jockerfile):
         """
         Run the command in the jail being created
         """
-        backend.exec(self.get_value(), **commands.env(commands.index_of(self)))
+        runner.exec(self.get_value(),
+                    **jockerfile.env(jockerfile.index_of(self)))
 
 
 class CommandAdd(CommandBase):
@@ -192,7 +181,7 @@ class CommandAdd(CommandBase):
         """
         return super(CommandAdd, self).get_value().split(' ', 2)
 
-    def build(self, backend, destdir, commands):
+    def build(self, backend, destdir):
         """
         Copy the content from value into dest inside the jail
         """
@@ -205,11 +194,28 @@ class CommandAdd(CommandBase):
             copy_tree(orig, dest)
 
 
-class CommandEntrypoint(CommandRun):
+class CommandJExec(CommandBase):
     """
-    ENTRYPOINT command class.
+    JExec command class.
     """
-    pass
+    def __init__(self, value):
+        """
+        Init method, value is the whole content without the command.
+        """
+        # check if ignore-errors flag was passed
+        if value.startswith('-o'):
+            self.ignore_errors = True
+            value = value[2:].strip()
+        else:
+            self.ignore_errors = False
+        super(CommandJExec, self).__init__(value)
+
+    def run(self, runner, jockerfile):
+        """
+        Run the command in the started jail
+        """
+        runner.exec(self.get_value(),
+                    **jockerfile.env(jockerfile.index_of(self)))
 
 
 class CommandVolume(CommandBase):
@@ -222,15 +228,20 @@ class CommandVolume(CommandBase):
         """
         return super(CommandVolume, self).get_value().split(' ', 2)
 
-    def create(self, backend, commands):
+    def build(self, backend, destdir):
+        """
+        Mount volume on mount
+        """
+        pass
+
+    def create(self, runner, jockerfile):
         """
         Define nullfs mount
         """
         pass
 
-    def build(self, backend, destdir, commands):
-        """Save volume definition"""
-        # mount_nullfs  with nullfs, how is it setup?
+    def mount(self, backend, destdir, commands):
+        """Volume mount"""
         orig, dest = self.get_value()
         return 'mount_nullfs {orig} {dest}'.format(
             orig=orig,
@@ -246,6 +257,6 @@ COMMANDS = {
     'env': CommandEnv,
     'run': CommandRun,
     'add': CommandAdd,
-    'entrypoint': CommandEntrypoint,
+    'jexec': CommandJExec,
     'volume': CommandVolume
 }

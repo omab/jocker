@@ -8,6 +8,7 @@ import tempfile
 import logging
 
 from ..commands import base_name
+from ..parser import build_command
 from ..archive import copy_tree
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -18,6 +19,7 @@ logger.setLevel(logging.DEBUG)
 class Backend(object):
     """Base backend definition"""
     BASE_DIR = os.environ.get('JOCKER_BASE_DIR', '/usr/jails/')
+    JAILS_DIR = BASE_DIR
 
     def __init__(self, jailname):
         """Backend initialization"""
@@ -28,9 +30,20 @@ class Backend(object):
         """Return the Jockerfile used to define base"""
         return os.path.join(self.BASE_DIR, base, 'etc', 'Jockerfile')
 
-    def create(self, network=None):
+    def jail_jockerfile(self):
+        """Return the Jockerfile used to define base"""
+        return os.path.join(self.JAILS_DIR, self.jailname, 'etc', 'Jockerfile')
+
+    def create_jail(self, jockerfile, base=None, network=None):
         """Create jail"""
         raise NotImplementedError('Implement in subclass')
+
+    def create(self, jockerfile, base=None, network=None):
+        """Create jail and run create commands to bootstrap on it"""
+        self.create_jail(jockerfile, base=base, network=network)
+        with self.runner() as runner:
+            for command in jockerfile.commands:
+                command.create(runner, jockerfile)
 
     def start(self):
         """Start jail"""
@@ -44,14 +57,19 @@ class Backend(object):
         """Exec command in jail"""
         raise NotImplementedError('Implement in subclass')
 
-    def build(self, commands, build=None, install=False):
-        name = base_name(commands)
+    def build(self, jockerfile, build=None, install=False):
+        name = jockerfile.name()
 
         self.logger.info('Building jail base: {name}'.format(name=name))
 
+        commands = [
+            # ensure the Jockerfile is copied into the new jail
+            build_command('ADD {path} /etc/'.format(path=jockerfile.path))
+        ] + jockerfile.commands
+
         with tempfile.TemporaryDirectory() as tmp:
             for command in commands:
-                command.build(self, tmp, commands)
+                command.build(self, tmp)
             if build:
                 destpath = os.path.join(build, name)
                 copy_tree(tmp, destpath)
@@ -61,6 +79,20 @@ class Backend(object):
                 copy_tree(tmp, destpath)
                 os.chmod(destpath, 0o755)
             return tmp
+
+    def run(self, jockerfile, command=None):
+        """Run default commands or given one in started jail"""
+        if command:
+            command = build_command('JEXEC {command}'.format(command=command))
+
+        commands = command and [command] or jockerfile.commands
+        returncode = 0
+
+        with self.runner() as runner:
+            for command in commands:
+                if returncode and not getattr(command, 'ignore_errors', False):
+                    break
+                returncode = command.run(self, jockerfile)
 
     def runner(self):
         """Return context runner"""
