@@ -7,7 +7,7 @@ from .backends.utils import get_backend
 
 def run(name, command=None, args=None):
     """
-    Run the given command or the default jexec calls in the jail
+    Run the given command or the default ENTRYPOINT call in the jail
     """
     jail_backend = get_backend(jailname=name)
     jockerfile = Jockerfile(jail_backend.jail_jockerfile())

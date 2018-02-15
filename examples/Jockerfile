@@ -10,4 +10,4 @@ RUN pkg install nginx
 ADD ./examples/resolv.conf /etc/
 ADD . /code
 VOLUME . /code
-JEXEC ls /foo || ls /tmp
+ENTRYPOINT ls /foo || ls /tmp

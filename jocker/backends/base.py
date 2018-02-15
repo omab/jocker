@@ -7,8 +7,8 @@ import uuid
 import tempfile
 import logging
 
-from ..commands import base_name
-from ..parser import build_command
+from ..commands import CommandEntrypoint
+from ..parser import build_command, Jockerfile
 from ..archive import copy_tree
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -34,6 +34,10 @@ class Backend(object):
         """Return the Jockerfile used to define base"""
         return os.path.join(self.JAILS_DIR, self.jailname, 'etc', 'Jockerfile')
 
+    def jaildir(self):
+        """Return the jail base directory"""
+        return os.path.join(self.JAILS_DIR, self.jailname)
+
     def create_jail(self, jockerfile, base=None, network=None):
         """Create jail"""
         raise NotImplementedError('Implement in subclass')
@@ -41,7 +45,7 @@ class Backend(object):
     def create(self, jockerfile, base=None, network=None):
         """Create jail and run create commands to bootstrap on it"""
         self.create_jail(jockerfile, base=base, network=network)
-        with self.runner() as runner:
+        with self.runner(create=True) as runner:
             for command in jockerfile.commands:
                 command.create(runner, jockerfile)
 
@@ -80,27 +84,52 @@ class Backend(object):
                 os.chmod(destpath, 0o755)
             return tmp
 
+    def bootstrap_jail(self, runner):
+        """Run any bootstraping command needed to run the jail"""
+        jockerfile = Jockerfile(self.jail_jockerfile())
+        commands = [command for command in jockerfile.commands
+                    if not isinstance(command, CommandEntrypoint)]
+        returncode = 0
+
+        for command in commands:
+            if returncode:
+                break
+            returncode = command.run(runner, jockerfile)
+
+    def unbootstrap_jail(self, runner):
+        """Roll-back any bootstraping command needed to run the jail"""
+        jockerfile = Jockerfile(self.jail_jockerfile())
+        commands = [command for command in jockerfile.commands
+                    if not isinstance(command, CommandEntrypoint)]
+        returncode = 0
+
+        for command in reversed(commands):
+            if returncode:
+                break
+            returncode = command.unrun(runner, jockerfile)
+
     def run(self, jockerfile, command=None):
         """Run default commands or given one in started jail"""
         if command:
-            command = build_command('JEXEC {command}'.format(command=command))
-
-        commands = command and [command] or jockerfile.commands
-        returncode = 0
+            command = build_command(
+                'ENTRYPOINT {command}'.format(command=command)
+            )
+        else:
+            command = jockerfile.entrypoint()
 
         with self.runner() as runner:
-            for command in commands:
-                if returncode and not getattr(command, 'ignore_errors', False):
-                    break
-                returncode = command.run(self, jockerfile)
+            command.run(runner, jockerfile)
 
-    def runner(self):
+    def runner(self, create=False):
         """Return context runner"""
-        return Runner(self, self.jailname)
+        if create:
+            return CreateRunner(self, self.jailname)
+        else:
+            return RunRunner(self, self.jailname)
 
 
-class Runner(object):
-    """Runner context manager"""
+class BaseRunner(object):
+    """Base runner context manager"""
     def __init__(self, backend, jailname):
         """Initialize context manager, jailname is needed"""
         self.jailname = jailname
@@ -118,3 +147,25 @@ class Runner(object):
     def __exit__(self, *args):
         """Stop jail upon leave"""
         self.backend.stop()
+
+
+class RunRunner(BaseRunner):
+    """Run runner context manager"""
+    def __enter__(self):
+        """Start jail upon enter"""
+        super(RunRunner, self).__enter__()
+        self.backend.bootstrap_jail(self)
+        return self
+
+    def __exit__(self, *args):
+        """Stop jail upon leave"""
+        self.backend.unbootstrap_jail(self)
+        super(RunRunner, self).__exit__()
+
+
+class CreateRunner(BaseRunner):
+    """Creation runner context manager"""
+    def __exit__(self, *args):
+        """Stop jail upon leave"""
+        self.backend.unbootstrap_jail(self)
+        super(CreateRunner, self).__exit__()

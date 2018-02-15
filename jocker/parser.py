@@ -3,7 +3,7 @@ Jockerfile file format parser
 """
 import re
 
-from .commands import COMMANDS, CommandEnv, CommandName, CommandJExec
+from .commands import COMMANDS, CommandEnv, CommandName, CommandEntrypoint
 
 
 # Join lines split by \
@@ -56,11 +56,11 @@ class Jockerfile(object):
         """
         return self.filter_commands(CommandName)[0].get_value()
 
-    def jexec(self):
+    def entrypoint(self):
         """
-        Return base runtime commands defined by the JEXEC command
+        Return base runtime commands defined by the ENTRYPOINT command
         """
-        return self.filter_commands(CommandJExec)
+        return self.filter_commands(CommandEntrypoint)[0]
 
     def index_of(self, command):
         """

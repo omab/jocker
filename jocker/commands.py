@@ -8,6 +8,7 @@ import shutil
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from .archive import copy_tree, copy_file
+from .utils import run_command
 
 
 JINJA_ENV = Environment(
@@ -48,6 +49,12 @@ class CommandBase(object):
     def run(self, runner, jockerfile):
         """
         Run this command into the started jail.
+        """
+        pass
+
+    def unrun(self, runner, jockerfile):
+        """
+        Undo the run of this command into the started jail.
         """
         pass
 
@@ -135,6 +142,13 @@ class CommandEnv(CommandBase):
         # TODO: return values instead of loading them in the os.environ
         self.load_value()
 
+    def unrun(self, runner, jockerfile):
+        """
+        Undo the env values load
+        """
+        # TODO: return values instead of loading them in the os.environ
+        self.unload_value()
+
     def build(self, backend, destdir):
         """
         Build Env command
@@ -151,12 +165,18 @@ class CommandEnv(CommandBase):
 
     def load_value(self):
         """
-        Load value and set it in the environment, don't write if key
-        already there.
+        Load value and set it in the environment
         """
         name, value = self.get_value()
-        if name not in os.environ:
-            os.environ[name] = value
+        os.environ[name] = value
+
+    def unload_value(self):
+        """
+        Unload value from the environment.
+        """
+        name, value = self.get_value()
+        if name in os.environ:
+            os.environ.pop(name)
 
 
 class CommandRun(CommandBase):
@@ -194,22 +214,10 @@ class CommandAdd(CommandBase):
             copy_tree(orig, dest)
 
 
-class CommandJExec(CommandBase):
+class CommandEntrypoint(CommandBase):
     """
-    JExec command class.
+    Entrypoint command class.
     """
-    def __init__(self, value):
-        """
-        Init method, value is the whole content without the command.
-        """
-        # check if ignore-errors flag was passed
-        if value.startswith('-o'):
-            self.ignore_errors = True
-            value = value[2:].strip()
-        else:
-            self.ignore_errors = False
-        super(CommandJExec, self).__init__(value)
-
     def run(self, runner, jockerfile):
         """
         Run the command in the started jail
@@ -222,31 +230,46 @@ class CommandVolume(CommandBase):
     """
     VOLUME command class.
     """
-    def get_value(self):
+    def get_value(self, runner=None):
         """
         Return stored value, splits value in src and dest pair.
         """
-        return super(CommandVolume, self).get_value().split(' ', 2)
+        orig, dest = super(CommandVolume, self).get_value().split(' ', 2)
+        if runner:
+            # Build absolute paths
+            orig = os.path.abspath(orig)
+            dest = os.path.join(runner.backend.jaildir(), dest.strip('/'))
+        return (orig, dest)
 
-    def build(self, backend, destdir):
+    def run(self, runner, jockerfile):
         """
-        Mount volume on mount
+        Mount volume on dest mountpoint
         """
-        pass
+        self.mount(runner, jockerfile)
+
+    def unrun(self, runner, jockerfile):
+        """
+        Umount volume on dest mountpoint
+        """
+        self.umount(runner, jockerfile)
 
     def create(self, runner, jockerfile):
         """
-        Define nullfs mount
+        Mount volume on dest mountpoint
         """
-        pass
+        self.mount(runner, jockerfile)
 
-    def mount(self, backend, destdir, commands):
+    def mount(self, runner, jockerfile):
         """Volume mount"""
-        orig, dest = self.get_value()
-        return 'mount_nullfs {orig} {dest}'.format(
-            orig=orig,
-            dest=dest
+        orig, dest = self.get_value(runner=runner)
+        return run_command(
+            'mount_nullfs {orig} {dest}'.format(orig=orig, dest=dest)
         )
+
+    def umount(self, runner, jockerfile):
+        """Volume umount"""
+        _, dest = self.get_value(runner=runner)
+        return run_command('umount {dest}'.format(dest=dest))
 
 
 COMMANDS = {
@@ -257,6 +280,6 @@ COMMANDS = {
     'env': CommandEnv,
     'run': CommandRun,
     'add': CommandAdd,
-    'jexec': CommandJExec,
+    'entrypoint': CommandEntrypoint,
     'volume': CommandVolume
 }
