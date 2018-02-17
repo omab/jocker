@@ -11,7 +11,7 @@ def create_from_base(base, name=None, network=None):
     """
     jail_backend = get_backend(jailname=name)
     jockerfile = jail_backend.base_jockerfile(base)
-    create_from_jockerfile(jockerfile, name, network)
+    jail_backend.create(jockerfile, network=network)
 
 
 def create_from_jockerfile(jockerfile, name=None, network=None):

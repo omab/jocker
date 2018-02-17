@@ -21,18 +21,25 @@ class Backend(object):
     BASE_DIR = os.environ.get('JOCKER_BASE_DIR', '/usr/jails/')
     JAILS_DIR = BASE_DIR
 
-    def __init__(self, jailname):
+    def __init__(self, jailname, base=None):
         """Backend initialization"""
         self.jailname = jailname or str(uuid.uuid4())
         self.logger = logger
 
     def base_jockerfile(self, base):
         """Return the Jockerfile used to define base"""
-        return os.path.join(self.BASE_DIR, base, 'etc', 'Jockerfile')
+        return Jockerfile(
+            os.path.join(self.BASE_DIR, base, 'etc', 'Jockerfile')
+        )
 
-    def jail_jockerfile(self):
+    @property
+    def jockerfile(self):
         """Return the Jockerfile used to define base"""
-        return os.path.join(self.JAILS_DIR, self.jailname, 'etc', 'Jockerfile')
+        if not hasattr(self, '_jockerfile'):
+            self._jockerfile = Jockerfile(
+                os.path.join(self.JAILS_DIR, self.jailname, 'etc', 'Jockerfile')
+            )
+        return self._jockerfile
 
     def jaildir(self):
         """Return the jail base directory"""
@@ -86,39 +93,37 @@ class Backend(object):
 
     def bootstrap_jail(self, runner):
         """Run any bootstraping command needed to run the jail"""
-        jockerfile = Jockerfile(self.jail_jockerfile())
-        commands = [command for command in jockerfile.commands
+        commands = [command for command in self.jockerfile.commands
                     if not isinstance(command, CommandEntrypoint)]
         returncode = 0
 
         for command in commands:
             if returncode:
                 break
-            returncode = command.run(runner, jockerfile)
+            returncode = command.run(runner, self.jockerfile)
 
     def unbootstrap_jail(self, runner):
         """Roll-back any bootstraping command needed to run the jail"""
-        jockerfile = Jockerfile(self.jail_jockerfile())
-        commands = [command for command in jockerfile.commands
+        commands = [command for command in self.jockerfile.commands
                     if not isinstance(command, CommandEntrypoint)]
         returncode = 0
 
         for command in reversed(commands):
             if returncode:
                 break
-            returncode = command.unrun(runner, jockerfile)
+            returncode = command.unrun(runner, self.jockerfile)
 
-    def run(self, jockerfile, command=None):
+    def run(self, command=None):
         """Run default commands or given one in started jail"""
         if command:
             command = build_command(
                 'ENTRYPOINT {command}'.format(command=command)
             )
         else:
-            command = jockerfile.entrypoint()
+            command = self.jockerfile.entrypoint()
 
         with self.runner() as runner:
-            command.run(runner, jockerfile)
+            command.run(runner, self.jockerfile)
 
     def runner(self, create=False):
         """Return context runner"""

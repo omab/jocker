@@ -35,17 +35,15 @@ def do_run(args):
 parser = argparse.ArgumentParser(
     description='Jocker - jail definition and management tool'
 )
-parser.add_argument(
-    '--jockerfile',
-    default='Jockerfile',
-    help='specify the Jockerfile (default ./Jockerfile)'
-)
 subparsers = parser.add_subparsers()
 
 build_parser = subparsers.add_parser(
     'build',
     description='Build a jail base'
 )
+build_parser.add_argument('--jockerfile',
+                          default='Jockerfile',
+                          help='specify the Jockerfile (default ./Jockerfile)')
 build_parser.add_argument('--build', help='build directory')
 build_parser.add_argument('--install', action='store_true',
                           help='install the built jail base')
@@ -55,6 +53,8 @@ create_parser = subparsers.add_parser(
     'create',
     description='Create a jail from the created base'
 )
+create_parser.add_argument('--jockerfile',
+                           help='specify the Jockerfile (default ./Jockerfile)')
 create_parser.add_argument('--base', help='base jail')
 create_parser.add_argument('--name', help='jail name')
 create_parser.add_argument('--net', help='jail network')
